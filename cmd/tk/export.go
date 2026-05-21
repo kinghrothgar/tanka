@@ -31,6 +31,7 @@ func exportCmd(ctx context.Context) *cli.Command {
 	)
 
 	extension := cmd.Flags().String("extension", "yaml", "File extension")
+	yamlDocStart := cmd.Flags().Bool("yaml-doc-start", false, "Prepend a YAML document-start marker (---) to each exported file")
 	parallel := cmd.Flags().IntP("parallel", "p", 8, "Number of environments to process in parallel")
 	cachePath := cmd.Flags().StringP("cache-path", "c", "", "Local file path where cached evaluations should be stored")
 	cacheEnvs := cmd.Flags().StringArrayP("cache-envs", "e", nil, "Regexes which define which environment should be cached (if caching is enabled)")
@@ -76,6 +77,7 @@ func exportCmd(ctx context.Context) *cli.Command {
 			Parallelism:      *parallel,
 			MergeDeletedEnvs: *mergeDeletedEnvs,
 			SkipManifest:     *skipManifest,
+			YAML:             tanka.YAMLFormatOpts{DocStart: *yamlDocStart},
 		}
 
 		if opts.MergeStrategy, err = determineMergeStrategy(*merge, *mergeStrategy); err != nil {

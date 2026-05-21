@@ -43,6 +43,12 @@ const (
 	ExportMergeStrategyReplaceEnvs   ExportMergeStrategy = "replace-envs"
 )
 
+// YAMLFormatOpts controls YAML output formatting for exported manifests.
+type YAMLFormatOpts struct {
+	// DocStart prepends a "---\n" document-start marker to each file.
+	DocStart bool
+}
+
 // ExportEnvOpts specify options on how to export environments
 type ExportEnvOpts struct {
 	// formatting the filename based on the exported Kubernetes manifest
@@ -66,6 +72,9 @@ type ExportEnvOpts struct {
 	MergeDeletedEnvs []string
 	// Skip generating manifest.json file that tracks exported files
 	SkipManifest bool
+
+	// YAML controls YAML output formatting.
+	YAML YAMLFormatOpts
 }
 
 func ExportEnvironments(ctx context.Context, envs []*v1alpha1.Environment, to string, opts *ExportEnvOpts) error {
@@ -254,7 +263,7 @@ func manifestSingleEnv(ctx context.Context, work *v1alpha1.Environment, to strin
 		}
 
 		// Write manifest
-		data := m.String()
+		data := formatManifestYAML(m, opts.YAML)
 		if err := writeExportFile(path, []byte(data)); err != nil {
 			return nil, err
 		}
@@ -372,6 +381,27 @@ func exportManifestFile(path string, newFileToEnvMap map[string]string, deletedK
 	}
 
 	return writeExportFile(manifestFilePath, data)
+}
+
+// formatManifestYAML returns the YAML representation of m with the requested
+// formatting applied. It is the export-path equivalent of
+// manifest.Manifest.String(); that method is intentionally left unchanged
+// because it is also consumed by diff and error-formatting code paths.
+func formatManifestYAML(m manifest.Manifest, opts YAMLFormatOpts) string {
+	s := m.String()
+	if opts.DocStart {
+		s = applyDocStart(s)
+	}
+	return s
+}
+
+// applyDocStart prepends a YAML document-start marker ("---\n") to s, unless
+// s already begins with one. The guard makes the operation idempotent.
+func applyDocStart(s string) string {
+	if strings.HasPrefix(s, "---\n") {
+		return s
+	}
+	return "---\n" + s
 }
 
 func writeExportFile(path string, data []byte) error {

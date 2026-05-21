@@ -256,3 +256,45 @@ func checkFiles(t testing.TB, dir string, files []string) {
 
 	assert.ElementsMatch(t, files, existingFiles)
 }
+
+func Test_formatManifestYAML(t *testing.T) {
+	m := manifest.Manifest{
+		"apiVersion": "v1",
+		"kind":       "ConfigMap",
+		"metadata": map[string]interface{}{
+			"name": "demo",
+		},
+	}
+	baseline := m.String()
+	require.False(t, strings.HasPrefix(baseline, "---\n"),
+		"precondition: Manifest.String() should not emit a leading '---'")
+
+	t.Run("doc-start off keeps output identical to Manifest.String()", func(t *testing.T) {
+		got := formatManifestYAML(m, YAMLFormatOpts{DocStart: false})
+		assert.Equal(t, baseline, got)
+	})
+
+	t.Run("doc-start on prepends ---", func(t *testing.T) {
+		got := formatManifestYAML(m, YAMLFormatOpts{DocStart: true})
+		assert.Equal(t, "---\n"+baseline, got)
+		assert.Equal(t, 1, strings.Count(got, "---\n"))
+	})
+}
+
+func Test_applyDocStart(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"plain input gets prefix", "apiVersion: v1\n", "---\napiVersion: v1\n"},
+		{"empty input gets prefix", "", "---\n"},
+		{"input already prefixed is unchanged (idempotent)", "---\napiVersion: v1\n", "---\napiVersion: v1\n"},
+		{"partial '---' without newline still gets prefix", "---apiVersion: v1\n", "---\n---apiVersion: v1\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, applyDocStart(tt.in))
+		})
+	}
+}
